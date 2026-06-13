@@ -1,0 +1,29 @@
+# ROS/catkin build outputs
+build/
+devel/
+install/
+log/
+.catkin_tools/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# VS Code local settings
+.vscode/
+
+# SFTP/private env files
+sftp_config.json
+scripts/pi_env.ps1
+
+# Logs and data captures
+*.log
+*.bag
+*.mp4
+*.avi
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
