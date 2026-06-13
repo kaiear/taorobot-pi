@@ -12,7 +12,8 @@ __pycache__/
 .pytest_cache/
 
 # VS Code local settings
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 
 # SFTP/private env files
 sftp_config.json

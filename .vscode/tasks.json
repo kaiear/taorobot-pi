@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Pi: Sync src to ROS workspace",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/sync_to_pi.ps1",
+            "problemMatcher": []
+        },
+        {
+            "label": "Pi: Catkin make",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/pi_exec.ps1",
+            "args": [
+                "cd ~/tao_robot_ws && source /opt/ros/noetic/setup.bash && catkin_make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Pi: Sync and catkin make",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Pi: Sync src to ROS workspace",
+                "Pi: Catkin make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Pi: Check ROS workspace",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/pi_exec.ps1",
+            "args": [
+                "ls -la ~/tao_robot_ws/src && source ~/tao_robot_ws/devel/setup.bash && rosversion -d"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

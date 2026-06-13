@@ -10,4 +10,8 @@ if (Test-Path $envFile) {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $localSrc = Join-Path $repoRoot "src"
 
-scp -r "$localSrc\*" "$PI_USER@$PI_HOST`:$PI_SRC/"
+ssh "$PI_USER@$PI_HOST" "mkdir -p '$PI_SRC'"
+
+Get-ChildItem -Force $localSrc | ForEach-Object {
+    scp -r $_.FullName "$PI_USER@$PI_HOST`:$PI_SRC/"
+}
