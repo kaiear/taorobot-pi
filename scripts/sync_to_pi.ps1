@@ -9,9 +9,15 @@ if (Test-Path $envFile) {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $localSrc = Join-Path $repoRoot "src"
+$sshTarget = "$PI_USER@$PI_HOST"
+$sshArgs = @()
 
-ssh "$PI_USER@$PI_HOST" "mkdir -p '$PI_SRC'"
+if ($PI_KEY -and (Test-Path $PI_KEY)) {
+    $sshArgs += @("-i", $PI_KEY)
+}
+
+ssh @sshArgs $sshTarget "mkdir -p '$PI_SRC'"
 
 Get-ChildItem -Force $localSrc | ForEach-Object {
-    scp -r $_.FullName "$PI_USER@$PI_HOST`:$PI_SRC/"
+    scp @sshArgs -r $_.FullName "$sshTarget`:$PI_SRC/"
 }

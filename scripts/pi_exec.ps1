@@ -12,4 +12,11 @@ if (Test-Path $envFile) {
     Write-Host "Using scripts/pi_env.example.ps1. Copy it to scripts/pi_env.ps1 and edit your Pi settings." -ForegroundColor Yellow
 }
 
-ssh "$PI_USER@$PI_HOST" $Command
+$sshTarget = "$PI_USER@$PI_HOST"
+$sshArgs = @()
+
+if ($PI_KEY -and (Test-Path $PI_KEY)) {
+    $sshArgs += @("-i", $PI_KEY)
+}
+
+ssh @sshArgs $sshTarget $Command
