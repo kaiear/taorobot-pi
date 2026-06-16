@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
+import os
 import struct
+import sys
+import threading
+import time
 
 import rospy
-from std_msgs.msg import String
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Int16MultiArray, String, UInt8
 
 try:
     import serial
 except ImportError:
     serial = None
+
+sys.path.insert(0, os.path.dirname(__file__))
+import serial_protocol as proto
 
 
 class TaoSerialNode:
@@ -22,16 +30,90 @@ class TaoSerialNode:
         self.open_serial = bool(rospy.get_param("~open_serial", False))
         self.ping_period = float(rospy.get_param("~ping_period", 1.0))
         self.timeout = float(rospy.get_param("~timeout", 0.1))
+        self.control_rate_hz = float(rospy.get_param("~control_rate_hz", 20.0))
+        self.cmd_timeout = float(rospy.get_param("~cmd_timeout", 0.5))
+        self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
+        self.buzzer_topic = rospy.get_param("~buzzer_topic", "/buzzer/play")
+        self.gripper_topic = rospy.get_param("~gripper_topic", "/gripper/command")
+        self.arm_joints_topic = rospy.get_param("~arm_joints_topic", "/tao_arm/joints_protocol_units")
+        self.auto_set_mode = bool(rospy.get_param("~auto_set_mode", True))
+        self.log_tx = bool(rospy.get_param("~log_tx", False))
+        self.log_rx = bool(rospy.get_param("~log_rx", True))
         self.serial_port = None
         self.rx_buffer = bytearray()
+        self.lock = threading.Lock()
+        self.last_cmd_vel = (0, 0, 0)
+        self.last_cmd_time = rospy.Time(0)
+        self.mode_sent = False
         self.rx_pub = rospy.Publisher("~rx", String, queue_size=10)
         self.tx_sub = rospy.Subscriber("~tx", String, self.handle_tx, queue_size=10)
+        self.cmd_vel_sub = rospy.Subscriber(self.cmd_vel_topic, Twist, self.handle_cmd_vel, queue_size=10)
+        self.buzzer_sub = rospy.Subscriber(self.buzzer_topic, UInt8, self.handle_buzzer, queue_size=10)
+        self.gripper_sub = rospy.Subscriber(self.gripper_topic, UInt8, self.handle_gripper, queue_size=10)
+        self.arm_joints_sub = rospy.Subscriber(self.arm_joints_topic, Int16MultiArray, self.handle_arm_joints, queue_size=10)
+        self.arm_seq = 0
 
         rospy.loginfo("tao_serial_node starting")
         rospy.loginfo("port=%s baudrate=%d open_serial=%s", self.port, self.baudrate, self.open_serial)
 
         if self.open_serial:
             self.open_serial_port()
+
+    def handle_cmd_vel(self, msg):
+        vx = int(round(msg.linear.x * 1000.0))
+        vy = int(round(msg.linear.y * 1000.0))
+        wz = int(round(msg.angular.z * 1000.0))
+        with self.lock:
+            self.last_cmd_vel = (vx, vy, wz)
+            self.last_cmd_time = rospy.Time.now()
+        rospy.loginfo("cmd_vel -> base_vel vx=%d vy=%d wz=%d", vx, vy, wz)
+
+    def handle_buzzer(self, msg):
+        melody_id = int(msg.data)
+        repeat = 1
+        rospy.loginfo("buzzer topic -> BUZZER melody=%d repeat=%d", melody_id, repeat)
+        self.send_buzzer(melody_id, repeat)
+
+    def handle_gripper(self, msg):
+        percent = max(0, min(100, int(msg.data)))
+        rospy.loginfo("gripper topic -> GRIPPER percent=%d", percent)
+        self.send_gripper(percent)
+
+    def handle_arm_joints(self, msg):
+        joints = [int(value) for value in msg.data]
+        if len(joints) != proto.JOINT_COUNT:
+            rospy.logerr("ARM_JOINTS requires %d values, got %d", proto.JOINT_COUNT, len(joints))
+            return
+
+        self.arm_seq = (self.arm_seq + 1) & 0xFF
+        duration_ms = 500
+        rospy.loginfo("arm topic -> ARM_JOINTS seq=%d joints=%s duration_ms=%d", self.arm_seq, joints, duration_ms)
+        self.send_arm_joints(self.arm_seq, joints, duration_ms)
+
+    def send_v2_frame(self, frame):
+        if frame:
+            self.write_bytes(frame)
+
+    def send_set_mode(self, mode):
+        self.send_v2_frame(proto.encode_set_mode(mode))
+
+    def send_heartbeat(self):
+        self.send_v2_frame(proto.encode_heartbeat(1))
+
+    def send_base_vel(self, vx, vy, wz):
+        self.send_v2_frame(proto.encode_base_vel(vx, vy, wz))
+
+    def send_buzzer(self, melody_id, repeat):
+        self.send_v2_frame(proto.encode_buzzer(melody_id, repeat))
+
+    def send_gripper(self, percent):
+        self.send_v2_frame(proto.encode_gripper(percent))
+
+    def send_arm_joints(self, seq, joints, duration_ms):
+        self.send_v2_frame(proto.encode_arm_joints(seq, joints, duration_ms))
+
+    def send_stop(self):
+        self.send_v2_frame(proto.encode_stop())
 
     def open_serial_port(self):
         if serial is None:
@@ -52,8 +134,14 @@ class TaoSerialNode:
             rospy.signal_shutdown("serial open failed")
 
     def handle_tx(self, msg):
-        rospy.loginfo("TX request: %s", msg.data)
-        self.write_line(msg.data)
+        if self.log_tx:
+            rospy.loginfo("TX request: %s", msg.data)
+        frame = self.build_v2_command(msg.data)
+        if frame is None:
+            self.write_line(msg.data)
+            return
+        if frame:
+            self.write_bytes(frame)
 
     def write_line(self, text):
         if self.serial_port is None:
@@ -61,7 +149,53 @@ class TaoSerialNode:
 
         line = text.rstrip("\r\n") + "\n"
         self.serial_port.write(line.encode("ascii"))
-        rospy.loginfo("TX: %s", line.strip())
+        if self.log_tx:
+            rospy.loginfo("TX: %s", line.strip())
+
+    def write_bytes(self, data):
+        if self.serial_port is None:
+            return
+
+        self.serial_port.write(data)
+        if self.log_tx:
+            rospy.loginfo("TX v2: %s", data.hex(" ").upper())
+
+    def build_v2_command(self, text):
+        parts = text.strip().split()
+        if not parts:
+            return None
+
+        command = parts[0].upper()
+        try:
+            if command == "STOP":
+                return proto.encode_stop()
+            if command == "SET_MODE" and len(parts) == 2:
+                mode_name = parts[1].upper()
+                mode = getattr(proto.Mode, mode_name) if hasattr(proto.Mode, mode_name) else int(parts[1], 0)
+                return proto.encode_set_mode(mode)
+            if command == "PING":
+                time_ms = int(parts[1], 0) if len(parts) == 2 else int(time.time() * 1000) & 0xFFFFFFFF
+                return proto.encode_ping(time_ms)
+            if command == "BASE_VEL" and len(parts) == 4:
+                return proto.encode_base_vel(int(parts[1]), int(parts[2]), int(parts[3]))
+            if command == "ARM_JOINTS" and len(parts) == 9:
+                seq = int(parts[1], 0)
+                joints = [int(value) for value in parts[2:8]]
+                duration_ms = int(parts[8], 0)
+                return proto.encode_arm_joints(seq, joints, duration_ms)
+            if command == "GRIPPER" and len(parts) == 2:
+                return proto.encode_gripper(int(parts[1], 0))
+            if command == "ARM_PRESET" and len(parts) == 2:
+                return proto.encode_arm_preset(int(parts[1], 0))
+            if command == "BUZZER" and len(parts) == 3:
+                return proto.encode_buzzer(int(parts[1], 0), int(parts[2], 0))
+            if command == "HEARTBEAT" and len(parts) == 2:
+                return proto.encode_heartbeat(int(parts[1], 0))
+        except (ValueError, struct.error) as exc:
+            rospy.logerr("Invalid v2 command '%s': %s", text, exc)
+            return b""
+
+        return None
 
     def read_available_data(self):
         if self.serial_port is None:
@@ -76,9 +210,21 @@ class TaoSerialNode:
 
     def parse_rx_buffer(self):
         while self.rx_buffer:
+            message, consumed = proto.try_decode_frame(self.rx_buffer)
+            if consumed:
+                del self.rx_buffer[:consumed]
+                if message is None:
+                    continue
+                summary = proto.describe_message(message)
+                if self.log_rx:
+                    rospy.loginfo("RX v2 frame: %s", summary)
+                self.rx_pub.publish(summary)
+                continue
+
             if self.rx_buffer.startswith(b"PONG\n"):
                 del self.rx_buffer[:5]
-                rospy.loginfo("RX text: PONG")
+                if self.log_rx:
+                    rospy.loginfo("RX text: PONG")
                 self.rx_pub.publish("PONG")
                 continue
 
@@ -109,7 +255,8 @@ class TaoSerialNode:
 
             del self.rx_buffer[:self.STM_TO_ROS_FRAME_LEN]
             message = self.decode_stm_frame(frame)
-            rospy.loginfo("RX frame: %s", message)
+            if self.log_rx:
+                rospy.loginfo("RX frame: %s", message)
             self.rx_pub.publish(message)
 
     def drop_noise_bytes(self, keep_last):
@@ -160,14 +307,31 @@ class TaoSerialNode:
         )
 
     def spin(self):
-        rate = rospy.Rate(1.0 / self.ping_period if self.ping_period > 0 else 1.0)
+        rate_hz = self.control_rate_hz if self.control_rate_hz > 0 else 20.0
+        rate = rospy.Rate(rate_hz)
         while not rospy.is_shutdown():
             if self.serial_port is None:
                 self.rx_pub.publish("PING skeleton alive")
             else:
-                self.write_line("PING")
+                if self.auto_set_mode and not self.mode_sent:
+                    self.send_set_mode(proto.Mode.ROS_AUTO)
+                    self.mode_sent = True
+
+                self.send_heartbeat()
+
+                with self.lock:
+                    last_cmd_vel = self.last_cmd_vel
+                    last_cmd_time = self.last_cmd_time
+
+                if last_cmd_time == rospy.Time(0) or (rospy.Time.now() - last_cmd_time).to_sec() > self.cmd_timeout:
+                    last_cmd_vel = (0, 0, 0)
+
+                self.send_base_vel(*last_cmd_vel)
                 self.read_available_data()
             rate.sleep()
+
+        if self.serial_port is not None:
+            self.send_stop()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+ <?xml version="1.0"?>
 <package format="2">
   <name>tao_bringup</name>
   <version>0.1.0</version>
@@ -10,6 +10,7 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <exec_depend>tao_serial</exec_depend>
+  <exec_depend>yeahbot_c1_moveit_config</exec_depend>
 
   <export/>
 </package>

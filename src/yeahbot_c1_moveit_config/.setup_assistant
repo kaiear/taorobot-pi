@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: yeahbot_c1
+    relative_path: urdf/yeahbot_c1.urdf
+    xacro_args: ""
+  SRDF:
+    relative_path: config/yeahbot_c1.srdf
+  CONFIG:
+    author_name: yeahbot
+    author_email: yeahbot@g.com
+    generated_timestamp: 1725246095

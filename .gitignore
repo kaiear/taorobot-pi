@@ -18,6 +18,7 @@ __pycache__/
 # SFTP/private env files
 sftp_config.json
 scripts/pi_env.ps1
+scripts/vm_env.ps1
 
 # Logs and data captures
 *.log

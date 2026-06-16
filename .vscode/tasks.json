@@ -8,9 +8,30 @@
             "problemMatcher": []
         },
         {
+            "label": "VM: Sync src to ROS workspace",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/sync_to_vm.ps1",
+            "problemMatcher": []
+        },
+        {
+            "label": "All: Sync src to Pi and VM",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/sync_to_targets.ps1",
+            "problemMatcher": []
+        },
+        {
             "label": "Pi: Catkin make",
             "type": "shell",
             "command": "${workspaceFolder}/scripts/pi_exec.ps1",
+            "args": [
+                "cd ~/tao_robot_ws && source /opt/ros/noetic/setup.bash && catkin_make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "VM: Catkin make",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/vm_exec.ps1",
             "args": [
                 "cd ~/tao_robot_ws && source /opt/ros/noetic/setup.bash && catkin_make"
             ],
@@ -22,6 +43,52 @@
             "dependsOn": [
                 "Pi: Sync src to ROS workspace",
                 "Pi: Catkin make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "VM: Sync and catkin make",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "VM: Sync src to ROS workspace",
+                "VM: Catkin make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "All: Sync and catkin make",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "All: Sync src to Pi and VM",
+                "Pi: Catkin make",
+                "VM: Catkin make"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Pi: Launch serial test",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/pi_exec.ps1",
+            "args": [
+                "cd ~/tao_robot_ws && source /opt/ros/noetic/setup.bash && source devel/setup.bash && roslaunch tao_bringup serial_test.launch open_serial:=true port:=/dev/ttyS0 log_tx:=true"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "VM: Launch MoveIt real bridge",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/vm_exec.ps1",
+            "args": [
+                "cd ~/tao_robot_ws && source /opt/ros/noetic/setup.bash && source devel/setup.bash && roslaunch tao_bringup moveit_real.launch"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Pi: Send arm home via tx",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/pi_exec.ps1",
+            "args": [
+                "source /opt/ros/noetic/setup.bash && source ~/tao_robot_ws/devel/setup.bash && rostopic pub -1 /tao_serial/tx std_msgs/String \"data: 'ARM_JOINTS 1 0 0 0 0 0 0 500'\""
             ],
             "problemMatcher": []
         },
