@@ -1,0 +1,25 @@
+face_greeting:
+  face_detected_topic: /vision/face/detected
+  cmd_vel_topic: /cmd_vel
+  buzzer_topic: /buzzer/play
+  arm_joints_topic: /tao_arm/joints_protocol_units
+
+  cooldown_sec: 20.0
+  trigger_on_rising_edge: true
+
+  enable_buzzer: true
+  buzzer_melody: 1
+
+  enable_base_wiggle: true
+  base_angular_z: 0.28
+  base_step_sec: 0.35
+  base_cycles: 2
+
+  # Keep arm wave disabled until these protocol-unit poses are calibrated safe.
+  enable_arm_wave: false
+  arm_step_sec: 0.80
+  arm_wave_poses:
+    - [0, 0, 1602, 1523, 0, 0]
+    - [250, 0, 1602, 1523, 0, 0]
+    - [-250, 0, 1602, 1523, 0, 0]
+    - [0, 0, 1602, 1523, 0, 0]

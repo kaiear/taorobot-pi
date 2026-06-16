@@ -1,0 +1,9 @@
+<launch>
+  <arg name="config" default="$(find tao_tasks)/config/task_behavior.yaml" />
+  <arg name="enable_arm_wave" default="false" />
+
+  <node pkg="tao_tasks" type="face_greeting_node.py" name="face_greeting_node" output="screen">
+    <rosparam command="load" file="$(arg config)" />
+    <param name="enable_arm_wave" value="$(arg enable_arm_wave)" />
+  </node>
+</launch>

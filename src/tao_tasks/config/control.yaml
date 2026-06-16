@@ -1,0 +1,25 @@
+# Safe first-pass control parameters for real-robot bring-up.
+# Start slow, verify direction, then tune on the actual map.
+
+line_follow:
+  line_visible_topic: /vision/line/visible
+  line_error_topic: /vision/line/error
+  intersection_topic: /vision/intersection/detected
+  cmd_vel_topic: /cmd_vel
+
+  # Safety switch. line_follow_debug.launch keeps this false.
+  publish_cmd_vel: false
+
+  rate_hz: 20.0
+  forward_speed: 0.06
+  intersection_forward_speed: 0.03
+  kp_angular: 0.45
+  max_angular_z: 0.35
+  error_deadband: 0.03
+  lost_timeout: 0.30
+  stop_on_intersection: false
+  slow_on_intersection: true
+
+  # With vision_sorter, error > 0 means the black line is right of image center.
+  # Positive ROS angular.z usually turns left, so the safe default is -1.0.
+  angular_sign: -1.0

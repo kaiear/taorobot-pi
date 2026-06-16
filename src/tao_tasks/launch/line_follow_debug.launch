@@ -1,0 +1,8 @@
+<launch>
+  <arg name="config" default="$(find tao_tasks)/config/control.yaml" />
+
+  <node pkg="tao_tasks" type="line_follow_controller.py" name="line_follow_controller" output="screen">
+    <rosparam command="load" file="$(arg config)" />
+    <param name="publish_cmd_vel" value="false" />
+  </node>
+</launch>
