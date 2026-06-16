@@ -1,0 +1,13 @@
+<launch>
+  <arg name="camera" default="0" />
+  <arg name="show" default="false" />
+
+  <group if="$(arg show)">
+    <node pkg="vision_sorter" type="mission_node" name="mission_node" output="screen"
+          args="--camera $(arg camera) --show" />
+  </group>
+  <group unless="$(arg show)">
+    <node pkg="vision_sorter" type="mission_node" name="mission_node" output="screen"
+          args="--camera $(arg camera)" />
+  </group>
+</launch>
