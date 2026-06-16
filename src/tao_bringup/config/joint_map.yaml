@@ -1,0 +1,19 @@
+# MoveIt radian target -> v2 ARM_JOINTS protocol units.
+# protocol_value = round((moveit_position_rad - offset_rad) * scale * sign)
+#
+# Keep these conservative until every joint direction/limit is verified on the real robot.
+arm_joint_names:
+  - arm_0_joint
+  - arm_1_joint
+  - arm_2_joint
+  - arm_3_joint
+  - arm_4_joint
+protocol_joint_count: 6
+protocol_offsets: [0.0, 0.0, 1.602, 1.523, 0.0, 0.0]
+protocol_signs: [1, 1, 1, 1, 1, 1]
+protocol_scale: 1000.0
+protocol_min: -30000
+protocol_max: 30000
+default_duration_ms: 500
+min_duration_ms: 80
+max_duration_ms: 5000

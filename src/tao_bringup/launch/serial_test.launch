@@ -1,4 +1,5 @@
 <launch>
+  <arg name="config" default="$(find tao_bringup)/config/serial.yaml" />
   <arg name="port" default="/dev/ttyS0" />
   <arg name="baudrate" default="115200" />
   <arg name="open_serial" default="false" />
@@ -14,6 +15,7 @@
   <arg name="log_rx" default="true" />
 
   <node pkg="tao_serial" type="tao_serial_node.py" name="tao_serial" output="screen">
+    <rosparam command="load" file="$(arg config)" />
     <param name="port" value="$(arg port)" />
     <param name="baudrate" value="$(arg baudrate)" />
     <param name="open_serial" value="$(arg open_serial)" />

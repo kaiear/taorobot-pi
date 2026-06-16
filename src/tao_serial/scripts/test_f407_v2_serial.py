@@ -80,8 +80,24 @@ def read_messages(port, timeout):
     return messages, bytes(buffer)
 
 
+def print_messages(messages, leftover=None):
+    if messages:
+        for message in messages:
+            print("RX:", hexdump(message["frame"]), "=>", describe_message(message))
+    elif leftover:
+        print("RX leftover:", hexdump(leftover))
+    else:
+        print("RX: no valid v2 frame")
+
+
+def read_and_print(port, timeout):
+    messages, leftover = read_messages(port, timeout)
+    print_messages(messages, leftover)
+    return messages
+
+
 def make_frame(args):
-    if args.command == "drive-test":
+    if args.command in ("drive-test", "buzzer-test", "gripper-test", "joint-test", "status-watch", "all-safe"):
         return None
     if args.command == "arm-joints":
         return encode_arm_joints(args.seq, args.joints, args.duration)
@@ -135,6 +151,29 @@ def build_parser():
     drive_test.add_argument("--wz", type=int, default=0, help="yaw velocity, rad/s * 1000")
     drive_test.add_argument("--duration", type=float, default=2.0, help="drive duration seconds")
     drive_test.add_argument("--rate", type=float, default=20.0, help="send rate Hz")
+
+    status_watch = subparsers.add_parser("status-watch", help="listen for STATUS/ACK/ERROR/PONG frames without sending motion")
+    status_watch.add_argument("--duration", type=float, default=5.0, help="watch duration seconds")
+
+    buzzer_test = subparsers.add_parser("buzzer-test", help="safe BUZZER test, short non-motion command")
+    buzzer_test.add_argument("--melody", type=int, default=1)
+    buzzer_test.add_argument("--repeat", type=int, default=1)
+
+    gripper_test = subparsers.add_parser("gripper-test", help="safe GRIPPER open/close test")
+    gripper_test.add_argument("--open", type=int, default=20, help="open percent, default: 20")
+    gripper_test.add_argument("--close", type=int, default=70, help="close percent, default: 70")
+    gripper_test.add_argument("--hold", type=float, default=0.8, help="hold time seconds between open/close")
+
+    joint_test = subparsers.add_parser("joint-test", help="safe small ARM_JOINTS test around zero protocol units")
+    joint_test.add_argument("--joint", type=int, default=0, choices=range(0, 6), help="joint index 0..5")
+    joint_test.add_argument("--delta", type=int, default=80, help="small protocol delta rad*1000, default: 80")
+    joint_test.add_argument("--duration", type=int, default=800, help="motion duration ms")
+    joint_test.add_argument("--hold", type=float, default=1.0, help="hold time seconds")
+
+    all_safe = subparsers.add_parser("all-safe", help="run non-aggressive protocol smoke tests: ping, mode, buzzer, gripper, tiny joint, stop")
+    all_safe.add_argument("--skip-joint", action="store_true", help="skip joint motion")
+    all_safe.add_argument("--skip-gripper", action="store_true", help="skip gripper motion")
+    all_safe.add_argument("--skip-buzzer", action="store_true", help="skip buzzer")
 
     heartbeat = subparsers.add_parser("heartbeat", help="send HEARTBEAT")
     heartbeat.add_argument("--state", type=int, default=0)
@@ -192,6 +231,81 @@ def run_drive_test(args):
     return 0
 
 
+def write_and_optionally_read(port, frame, label, timeout=0.3):
+    write_frame(port, frame, label)
+    return read_and_print(port, timeout)
+
+
+def run_status_watch(args):
+    with serial.Serial(args.port, args.baud, timeout=0.02) as port:
+        print("Watching serial feedback for %.1fs ..." % args.duration)
+        messages, leftover = read_messages(port, args.duration)
+    print_messages(messages, leftover)
+    return 0 if messages else 1
+
+
+def run_buzzer_test(args):
+    with serial.Serial(args.port, args.baud, timeout=0.02) as port:
+        port.reset_input_buffer()
+        write_and_optionally_read(port, encode_set_mode(Mode.ROS_AUTO), "TX set-mode")
+        write_and_optionally_read(port, encode_buzzer(args.melody, args.repeat), "TX buzzer", args.timeout)
+    return 0
+
+
+def run_gripper_test(args):
+    open_percent = max(0, min(100, args.open))
+    close_percent = max(0, min(100, args.close))
+    with serial.Serial(args.port, args.baud, timeout=0.02) as port:
+        port.reset_input_buffer()
+        write_and_optionally_read(port, encode_set_mode(Mode.ROS_AUTO), "TX set-mode")
+        write_and_optionally_read(port, encode_gripper(open_percent), "TX gripper-open")
+        time.sleep(args.hold)
+        write_and_optionally_read(port, encode_gripper(close_percent), "TX gripper-close")
+        time.sleep(args.hold)
+        write_and_optionally_read(port, encode_gripper(open_percent), "TX gripper-open-final", args.timeout)
+    return 0
+
+
+def run_joint_test(args):
+    joints = [0] * 6
+    joints[args.joint] = int(args.delta)
+    zero = [0] * 6
+    with serial.Serial(args.port, args.baud, timeout=0.02) as port:
+        port.reset_input_buffer()
+        write_and_optionally_read(port, encode_set_mode(Mode.ROS_AUTO), "TX set-mode")
+        write_and_optionally_read(port, encode_heartbeat(1), "TX heartbeat")
+        write_and_optionally_read(port, encode_arm_joints(1, joints, args.duration), "TX joint-delta")
+        time.sleep(args.hold)
+        write_and_optionally_read(port, encode_heartbeat(1), "TX heartbeat")
+        write_and_optionally_read(port, encode_arm_joints(2, zero, args.duration), "TX joint-zero")
+        time.sleep(args.hold)
+        write_and_optionally_read(port, encode_stop(), "TX stop", args.timeout)
+    return 0
+
+
+def run_all_safe(args):
+    with serial.Serial(args.port, args.baud, timeout=0.02) as port:
+        port.reset_input_buffer()
+        write_and_optionally_read(port, encode_ping(int(time.time() * 1000) & 0xFFFFFFFF), "TX ping")
+        write_and_optionally_read(port, encode_set_mode(Mode.ROS_AUTO), "TX set-mode")
+        write_and_optionally_read(port, encode_heartbeat(1), "TX heartbeat")
+        write_and_optionally_read(port, encode_base_vel(0, 0, 0), "TX base-zero")
+        if not args.skip_buzzer:
+            write_and_optionally_read(port, encode_buzzer(1, 1), "TX buzzer")
+        if not args.skip_gripper:
+            write_and_optionally_read(port, encode_gripper(20), "TX gripper-open")
+            time.sleep(0.5)
+            write_and_optionally_read(port, encode_gripper(70), "TX gripper-close")
+            time.sleep(0.5)
+            write_and_optionally_read(port, encode_gripper(20), "TX gripper-open-final")
+        if not args.skip_joint:
+            write_and_optionally_read(port, encode_arm_joints(1, [60, 0, 0, 0, 0, 0], 800), "TX tiny-joint")
+            time.sleep(0.8)
+            write_and_optionally_read(port, encode_arm_joints(2, [0, 0, 0, 0, 0, 0], 800), "TX joint-zero")
+        write_and_optionally_read(port, encode_stop(), "TX stop", args.timeout)
+    return 0
+
+
 def main():
     if serial is None:
         print("pyserial is not installed. Install it with: python -m pip install pyserial", file=sys.stderr)
@@ -202,6 +316,16 @@ def main():
 
     if args.command == "drive-test":
         return run_drive_test(args)
+    if args.command == "status-watch":
+        return run_status_watch(args)
+    if args.command == "buzzer-test":
+        return run_buzzer_test(args)
+    if args.command == "gripper-test":
+        return run_gripper_test(args)
+    if args.command == "joint-test":
+        return run_joint_test(args)
+    if args.command == "all-safe":
+        return run_all_safe(args)
 
     frame = make_frame(args)
 
@@ -216,15 +340,8 @@ def main():
 
         messages, leftover = read_messages(port, args.timeout)
 
-    if not messages:
-        print("RX: no valid v2 frame")
-        if leftover:
-            print("RX leftover:", hexdump(leftover))
-        return 1
-
-    for message in messages:
-        print("RX:", hexdump(message["frame"]), "=>", describe_message(message))
-    return 0
+    print_messages(messages, leftover)
+    return 0 if messages else 1
 
 
 if __name__ == "__main__":

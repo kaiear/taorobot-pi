@@ -1,0 +1,17 @@
+# First safe named poses for tasks 4/5/6/7.
+# Values are MoveIt joint radians for arm_0_joint..arm_4_joint unless noted.
+# Calibrate on the real robot and keep task code reading this file instead of hard-coding poses.
+named_poses:
+  home: [0.0, 0.0, 1.602, 1.523, 0.0]
+  safe_up: [0.0, 0.0, 1.602, 1.523, 0.0]
+  pick_ready: [0.0, 0.0, 1.602, 1.523, 0.0]
+  place_ready: [0.0, 0.0, 1.602, 1.523, 0.0]
+  wave_1: [0.25, 0.0, 1.602, 1.523, 0.0]
+  wave_2: [-0.25, 0.0, 1.602, 1.523, 0.0]
+  stack_1: [0.0, 0.0, 1.602, 1.523, 0.0]
+  stack_2: [0.0, 0.0, 1.602, 1.523, 0.0]
+  stack_3: [0.0, 0.0, 1.602, 1.523, 0.0]
+
+gripper:
+  open_percent: 20
+  close_percent: 70

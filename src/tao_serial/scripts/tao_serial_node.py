@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import json
 import struct
 import sys
 import threading
@@ -7,6 +8,7 @@ import time
 
 import rospy
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Int16MultiArray, String, UInt8
 
 try:
@@ -36,6 +38,19 @@ class TaoSerialNode:
         self.buzzer_topic = rospy.get_param("~buzzer_topic", "/buzzer/play")
         self.gripper_topic = rospy.get_param("~gripper_topic", "/gripper/command")
         self.arm_joints_topic = rospy.get_param("~arm_joints_topic", "/tao_arm/joints_protocol_units")
+        self.status_topic = rospy.get_param("~status_topic", "/tao_serial/status_json")
+        self.ack_topic = rospy.get_param("~ack_topic", "/tao_serial/ack_json")
+        self.error_topic = rospy.get_param("~error_topic", "/tao_serial/error_json")
+        self.pong_topic = rospy.get_param("~pong_topic", "/tao_serial/pong_json")
+        self.publish_joint_states = bool(rospy.get_param("~publish_joint_states", True))
+        self.joint_state_topic = rospy.get_param("~joint_state_topic", "/joint_states")
+        self.joint_state_names = list(
+            rospy.get_param(
+                "~joint_state_names",
+                ["arm_0_joint", "arm_1_joint", "arm_2_joint", "arm_3_joint", "arm_4_joint", "arm_5_joint"],
+            )
+        )
+        self.joint_state_scale = float(rospy.get_param("~joint_state_scale", 1000.0))
         self.auto_set_mode = bool(rospy.get_param("~auto_set_mode", True))
         self.log_tx = bool(rospy.get_param("~log_tx", False))
         self.log_rx = bool(rospy.get_param("~log_rx", True))
@@ -46,6 +61,11 @@ class TaoSerialNode:
         self.last_cmd_time = rospy.Time(0)
         self.mode_sent = False
         self.rx_pub = rospy.Publisher("~rx", String, queue_size=10)
+        self.status_pub = rospy.Publisher(self.status_topic, String, queue_size=10)
+        self.ack_pub = rospy.Publisher(self.ack_topic, String, queue_size=10)
+        self.error_pub = rospy.Publisher(self.error_topic, String, queue_size=10)
+        self.pong_pub = rospy.Publisher(self.pong_topic, String, queue_size=10)
+        self.joint_state_pub = rospy.Publisher(self.joint_state_topic, JointState, queue_size=10) if self.publish_joint_states else None
         self.tx_sub = rospy.Subscriber("~tx", String, self.handle_tx, queue_size=10)
         self.cmd_vel_sub = rospy.Subscriber(self.cmd_vel_topic, Twist, self.handle_cmd_vel, queue_size=10)
         self.buzzer_sub = rospy.Subscriber(self.buzzer_topic, UInt8, self.handle_buzzer, queue_size=10)
@@ -219,6 +239,7 @@ class TaoSerialNode:
                 if self.log_rx:
                     rospy.loginfo("RX v2 frame: %s", summary)
                 self.rx_pub.publish(summary)
+                self.publish_decoded_message(message)
                 continue
 
             if self.rx_buffer.startswith(b"PONG\n"):
@@ -258,6 +279,40 @@ class TaoSerialNode:
             if self.log_rx:
                 rospy.loginfo("RX frame: %s", message)
             self.rx_pub.publish(message)
+
+    def publish_decoded_message(self, message):
+        decoded = proto.decode_message(message)
+        json_text = json.dumps(decoded, sort_keys=True, separators=(",", ":"))
+        msg_type = decoded.get("type")
+
+        if msg_type == proto.MsgType.STATUS:
+            self.status_pub.publish(json_text)
+            self.publish_status_joint_state(decoded)
+            return
+        if msg_type == proto.MsgType.ACK:
+            self.ack_pub.publish(json_text)
+            return
+        if msg_type == proto.MsgType.ERROR:
+            self.error_pub.publish(json_text)
+            return
+        if msg_type == proto.MsgType.PONG:
+            self.pong_pub.publish(json_text)
+            return
+
+    def publish_status_joint_state(self, decoded):
+        if self.joint_state_pub is None or not decoded.get("valid_length", False):
+            return
+
+        joints = decoded.get("joints", [])
+        if not joints:
+            return
+
+        count = min(len(joints), len(self.joint_state_names))
+        msg = JointState()
+        msg.header.stamp = rospy.Time.now()
+        msg.name = self.joint_state_names[:count]
+        msg.position = [float(value) / self.joint_state_scale for value in joints[:count]]
+        self.joint_state_pub.publish(msg)
 
     def drop_noise_bytes(self, keep_last):
         drop_len = max(0, len(self.rx_buffer) - keep_last)
