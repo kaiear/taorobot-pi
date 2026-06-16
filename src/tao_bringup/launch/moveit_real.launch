@@ -1,0 +1,24 @@
+<launch>
+  <arg name="use_rviz" default="true" />
+  <arg name="auto_set_mode" default="true" />
+  <arg name="command_topic" default="/tao_arm/joints_protocol_units" />
+  <arg name="tx_topic" default="/tao_serial/tx" />
+  <arg name="joint_map" default="$(find tao_bringup)/config/joint_map.yaml" />
+  <arg name="task_poses" default="$(find tao_bringup)/config/task_poses.yaml" />
+
+  <node pkg="tao_serial" type="tao_moveit_bridge.py" name="tao_moveit_bridge" output="screen">
+    <rosparam command="load" file="$(arg joint_map)" />
+    <rosparam command="load" file="$(arg task_poses)" />
+    <param name="action_name" value="arm_controller/follow_joint_trajectory" />
+    <param name="command_topic" value="$(arg command_topic)" />
+    <param name="tx_topic" value="$(arg tx_topic)" />
+    <param name="use_tx_command" value="true" />
+    <param name="publish_shadow_topic" value="false" />
+    <param name="auto_set_mode" value="$(arg auto_set_mode)" />
+  </node>
+
+  <include file="$(find yeahbot_c1_moveit_config)/launch/demo.launch">
+    <arg name="moveit_controller_manager" value="simple" />
+    <arg name="use_rviz" value="$(arg use_rviz)" />
+  </include>
+</launch>

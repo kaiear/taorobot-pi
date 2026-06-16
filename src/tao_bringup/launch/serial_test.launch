@@ -1,0 +1,33 @@
+<launch>
+  <arg name="config" default="$(find tao_bringup)/config/serial.yaml" />
+  <arg name="port" default="/dev/ttyS0" />
+  <arg name="baudrate" default="115200" />
+  <arg name="open_serial" default="false" />
+  <arg name="ping_period" default="1.0" />
+  <arg name="control_rate_hz" default="20.0" />
+  <arg name="cmd_timeout" default="0.5" />
+  <arg name="cmd_vel_topic" default="/cmd_vel" />
+  <arg name="buzzer_topic" default="/buzzer/play" />
+  <arg name="gripper_topic" default="/gripper/command" />
+  <arg name="arm_joints_topic" default="/tao_arm/joints_protocol_units" />
+  <arg name="auto_set_mode" default="true" />
+  <arg name="log_tx" default="false" />
+  <arg name="log_rx" default="true" />
+
+  <node pkg="tao_serial" type="tao_serial_node.py" name="tao_serial" output="screen">
+    <rosparam command="load" file="$(arg config)" />
+    <param name="port" value="$(arg port)" />
+    <param name="baudrate" value="$(arg baudrate)" />
+    <param name="open_serial" value="$(arg open_serial)" />
+    <param name="ping_period" value="$(arg ping_period)" />
+    <param name="control_rate_hz" value="$(arg control_rate_hz)" />
+    <param name="cmd_timeout" value="$(arg cmd_timeout)" />
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)" />
+    <param name="buzzer_topic" value="$(arg buzzer_topic)" />
+    <param name="gripper_topic" value="$(arg gripper_topic)" />
+    <param name="arm_joints_topic" value="$(arg arm_joints_topic)" />
+    <param name="auto_set_mode" value="$(arg auto_set_mode)" />
+    <param name="log_tx" value="$(arg log_tx)" />
+    <param name="log_rx" value="$(arg log_rx)" />
+  </node>
+</launch>

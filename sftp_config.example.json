@@ -1,0 +1,25 @@
+{
+  "name": "tao-pi4-ros-src",
+  "host": "192.168.137.100",
+  "port": 22,
+  "username": "ubuntu",
+  "password": "你的密码，建议后续改 SSH 密钥",
+  "remotePath": "/home/ubuntu/tao_robot_ws/src",
+  "localPath": "D:\\cpprobot\\pi\\src",
+  "uploadOnSave": true,
+  "downloadOnOpen": true,
+  "ignore": [
+    ".git",
+    ".vscode",
+    "build",
+    "devel",
+    "install",
+    "log",
+    "node_modules",
+    "__pycache__",
+    "*.pyc",
+    "*.bag",
+    "*.mp4",
+    "*.avi"
+  ]
+}
