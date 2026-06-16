@@ -1,0 +1,44 @@
+%YAML:1.0
+---
+# 示例相机与视觉参数配置
+image_size:
+  width: 640
+  height: 480
+
+# 阈值（HSV）
+black_low: [0, 0, 0]
+black_high: [179, 255, 85]
+
+# 色块范围，ranges 中每项是两个 HSV 三元组（low, high）
+color_ranges:
+  - name: red
+    draw_color: [0, 0, 255]
+    ranges:
+      - [ [0, 110, 100], [10, 255, 255] ]
+      - [ [160, 110, 100], [179, 255, 255] ]
+  - name: green
+    draw_color: [0, 255, 0]
+    ranges:
+      - [ [40, 70, 0], [90, 255, 255] ]
+  - name: blue
+    draw_color: [255, 0, 0]
+    ranges:
+      - [ [100, 150, 70], [130, 255, 255] ]
+
+# ROI 定义，每项 6 个数: x, y, w, h, weight, id
+rois:
+  - [0, 260, 640, 20, 0.25, 1]
+  - [0, 130, 640, 20, 0.20, 2]
+  - [0, 0, 640, 20, 0.10, 3]
+
+min_line_area: 400
+min_cross_area: 4000
+min_color_area: 1000
+
+# 相机内参。命令行 --fx/--fy/--cx/--cy 会覆盖这里的值。
+camera_matrix:
+  fx: 600.0
+  fy: 600.0
+  cx: 320.0
+  cy: 240.0
+dist_coeffs: [0, 0, 0, 0, 0]
