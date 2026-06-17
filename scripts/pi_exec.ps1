@@ -13,7 +13,11 @@ if (Test-Path $envFile) {
 }
 
 $sshTarget = "$PI_USER@$PI_HOST"
-$sshArgs = @()
+$sshArgs = @(
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=8",
+    "-o", "ConnectionAttempts=1"
+)
 
 if ($PI_KEY -and (Test-Path $PI_KEY)) {
     $sshArgs += @("-i", $PI_KEY)

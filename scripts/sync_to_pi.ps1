@@ -9,7 +9,11 @@ if (Test-Path $envFile) {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $localSrc = Join-Path $repoRoot "src"
-$sshArgs = @()
+$sshArgs = @(
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=8",
+    "-o", "ConnectionAttempts=1"
+)
 
 if ($PI_KEY -and (Test-Path $PI_KEY)) {
     $sshArgs += @("-i", $PI_KEY)
