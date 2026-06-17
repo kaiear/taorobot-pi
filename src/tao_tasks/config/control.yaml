@@ -67,7 +67,13 @@ line_follow:
   post_pick_uturn_linear_x: 0.03
   post_pick_uturn_angular_z: 0.70
   post_pick_uturn_delay: 130
-  min_color_area: 1000
+  # Debug-friendly threshold; raise after lighting/camera exposure is stable.
+  min_color_area: 500
+  pick_align_timeout_ticks: 180
+  pick_align_max_retries: 2
+  pick_align_skip_on_timeout: true
+  pick_align_stable_ticks: 50
+  color_log_interval: 1.0
   color_roi: [0, 0, 640, 300]
   color_ranges:
     - name: red
@@ -120,8 +126,8 @@ line_follow:
   moveit_arm_joint_names: [arm_0_joint, arm_1_joint, arm_2_joint, arm_3_joint, arm_4_joint]
   moveit_planning_time: 5.0
   moveit_num_planning_attempts: 8
-  moveit_max_velocity_scaling: 0.25
-  moveit_max_acceleration_scaling: 0.25
+  moveit_max_velocity_scaling: 0.50
+  moveit_max_acceleration_scaling: 0.50
   moveit_wait_timeout: 2.0
   moveit_result_timeout_padding: 1.0
   moveit_fallback_on_failure: true

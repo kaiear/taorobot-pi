@@ -602,12 +602,19 @@ class LineFollowController:
         self.closed_gripper = float(private_param("closed_gripper", 0.0))
         self.init_arm_on_start = as_bool(private_param("init_arm_on_start", False))
         self.preposition_arm_before_pick = as_bool(private_param("preposition_arm_before_pick", False))
+        self.pick_align_timeout_ticks = int(private_param("pick_align_timeout_ticks", 180))
+        self.pick_align_max_retries = int(private_param("pick_align_max_retries", 2))
+        self.pick_align_skip_on_timeout = as_bool(private_param("pick_align_skip_on_timeout", True))
+        self.pick_align_stable_ticks = int(private_param("pick_align_stable_ticks", 50))
+        self.color_log_interval = float(private_param("color_log_interval", 1.0))
         self.move_x = self.arm_err_x
         self.move_y = 150.0
         self.spin_claw = 0.0
         self.move_status = 0
         self.arm_task_phase = ARM_PHASE_IDLE
         self.captured_color = BLOCK_NONE
+        self.pick_align_ticks = 0
+        self.pick_align_retries = 0
         self.line_mode = True
         self.car_back_flag = False
         self.mid_adjust_position = False
@@ -625,6 +632,7 @@ class LineFollowController:
         self.last_visible_time = rospy.Time(0)
         self.last_log_time = rospy.Time(0)
         self.last_roi_areas = {}
+        self.latest_camera_frame = None
 
         # C++ state names: crossingFlag_, crossingRecordCnt_, timeCnt_.
         # crossing_flag: 0=idle, 1=armed by ROI2, 2=counted/action, 3=wait until leaving cross.
@@ -781,6 +789,7 @@ class LineFollowController:
             rospy.logwarn_throttle(1.0, "camera frame read failed")
             self.visible = False
             return None
+        self.latest_camera_frame = frame
 
         if self.line_mode:
             detection = self.detector.detect(frame)
@@ -975,6 +984,9 @@ class LineFollowController:
             self.line_mode = False
             self.crossing_flag = 0
             self.time_count = 0
+            self.pick_align_ticks = 0
+            self.pick_align_retries = 0
+            self.captured_color = BLOCK_NONE
             rospy.loginfo("pick state start: cross=%d", cross)
             return True, "pick_cross_{}".format(cross), cmd
 
@@ -1035,10 +1047,15 @@ class LineFollowController:
         return False, "cross_continue", cmd
 
     def latest_frame(self):
+        if self.latest_camera_frame is not None:
+            return self.latest_camera_frame
         if self.cap is None or not self.cap.isOpened():
             return None
         ok, frame = self.cap.read()
-        return frame if ok else None
+        if ok:
+            self.latest_camera_frame = frame
+            return frame
+        return None
 
     def handle_color_block(self):
         cmd = Twist()
@@ -1049,6 +1066,19 @@ class LineFollowController:
         block_cx, block_cy = blob["center"] if success else (320, 240)
         contour = blob["contour"] if success else None
         visible_color = blob["color"] if success else BLOCK_NONE
+
+        if self.arm_task_phase != ARM_PHASE_IDLE and self.color_log_interval > 0.0:
+            rospy.loginfo_throttle(
+                self.color_log_interval,
+                "color detect phase=%s move=%d target=%s success=%s color=%s center=(%d,%d)",
+                self.arm_task_phase,
+                self.move_status,
+                self.captured_color,
+                success,
+                visible_color,
+                block_cx,
+                block_cy,
+            )
 
         if self.arm_task_phase == ARM_PHASE_IDLE:
             self.line_mode = True
@@ -1061,25 +1091,48 @@ class LineFollowController:
         if self.arm_task_phase == ARM_PHASE_PLACE and self.move_status < 2:
             self.move_status = 2
 
-        if self.arm_task_phase == ARM_PHASE_PICK and self.move_status == 0 and success:
-            if abs(block_cx - 320) > 10:
-                self.move_x += -0.5 if block_cx > 320 else 0.5
-            if abs(block_cy - 240) > 10:
-                self.move_y += -0.3 if block_cy > 240 and self.move_y > 1.0 else 0.3
-            if abs(block_cx - 320) <= 10 and abs(block_cy - 240) <= 10:
-                self.time_count += 1
-                if self.time_count > 50:
+        if self.arm_task_phase == ARM_PHASE_PICK and self.move_status == 0:
+            self.pick_align_ticks += 1
+            if success:
+                if abs(block_cx - 320) > 10:
+                    self.move_x += -0.5 if block_cx > 320 else 0.5
+                if abs(block_cy - 240) > 10:
+                    self.move_y += -0.3 if block_cy > 240 and self.move_y > 1.0 else 0.3
+                if abs(block_cx - 320) <= 10 and abs(block_cy - 240) <= 10:
+                    self.time_count += 1
+                    if self.time_count > self.pick_align_stable_ticks:
+                        self.time_count = 0
+                        self.pick_align_ticks = 0
+                        self.move_status = 1
+                        self.captured_color = visible_color
+                        self.spin_claw = 0.0
+                        length = math.sqrt(self.move_x * self.move_x + self.move_y * self.move_y)
+                        if length > 1e-6:
+                            self.move_x = (length + self.arm_skewing) * self.move_x / length
+                            self.move_y = (length + self.arm_skewing) * self.move_y / length
+                elif self.preposition_arm_before_pick:
                     self.time_count = 0
-                    self.move_status = 1
-                    self.captured_color = visible_color
-                    self.spin_claw = 0.0
-                    length = math.sqrt(self.move_x * self.move_x + self.move_y * self.move_y)
-                    if length > 1e-6:
-                        self.move_x = (length + self.arm_skewing) * self.move_x / length
-                        self.move_y = (length + self.arm_skewing) * self.move_y / length
-            elif self.preposition_arm_before_pick:
+                    self.move_arm(self.move_x, self.move_y, self.arm_up, 0)
+                else:
+                    self.time_count = 0
+            else:
                 self.time_count = 0
-                self.move_arm(self.move_x, self.move_y, self.arm_up, 0)
+            if self.pick_align_timeout_ticks > 0 and self.pick_align_ticks > self.pick_align_timeout_ticks:
+                if self.pick_align_retries < self.pick_align_max_retries:
+                    self.pick_align_retries += 1
+                    self.pick_align_ticks = 0
+                    self.move_x = self.arm_err_x
+                    self.move_y = 150.0
+                    rospy.logwarn(
+                        "pick align timeout: cross=%d retry=%d/%d",
+                        self.cross_count,
+                        self.pick_align_retries,
+                        self.pick_align_max_retries,
+                    )
+                elif self.pick_align_skip_on_timeout:
+                    rospy.logwarn("pick align skipped after timeout: cross=%d", self.cross_count)
+                    self.finish_pick_phase()
+                    return cmd, "pick_align_timeout_skip"
             return cmd, "pick_align"
 
         if self.arm_task_phase == ARM_PHASE_PICK and self.move_status == 1:
@@ -1097,6 +1150,8 @@ class LineFollowController:
                 self.move_arm(self.move_x, self.move_y, self.arm_up, 1000)
             elif 245 <= self.time_count < 280:
                 self.move_status = 2
+                self.pick_align_ticks = 0
+                self.pick_align_retries = 0
                 self.move_x = self.arm_err_x
                 self.move_y = 150.0
                 self.spin_claw = 0.0
