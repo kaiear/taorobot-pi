@@ -2,6 +2,9 @@
 # protocol_value = round((moveit_position_rad - offset_rad) * scale * sign)
 #
 # Keep these conservative until every joint direction/limit is verified on the real robot.
+# Fine zero differences should normally be calibrated here, not by bending the URDF:
+#   protocol_offsets[i] = current offset + measured_moveit_zero_error_rad
+# Leave signs/scales unchanged unless a joint direction or unit conversion is wrong.
 arm_joint_names:
   - arm_0_joint
   - arm_1_joint
@@ -14,6 +17,6 @@ protocol_signs: [1, 1, 1, 1, 1, 1]
 protocol_scale: 1000.0
 protocol_min: -30000
 protocol_max: 30000
-default_duration_ms: 500
-min_duration_ms: 80
-max_duration_ms: 5000
+default_duration_ms: 350
+min_duration_ms: 50
+max_duration_ms: 4000
