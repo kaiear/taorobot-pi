@@ -2,6 +2,16 @@
 # Start slow, verify direction, then tune on the actual map.
 
 line_follow:
+  # Standalone integrated test mode. true = open camera in this node and run
+  # Python port of vision_sorter ROI/crossing logic; false = subscribe to
+  # /vision/line/* topics as the old controller did.
+  use_camera: true
+  camera_index: 0
+  camera_backend: v4l2
+  image_width: 640
+  image_height: 480
+  show: false
+
   line_visible_topic: /vision/line/visible
   line_error_topic: /vision/line/error
   intersection_topic: /vision/intersection/detected
@@ -23,3 +33,45 @@ line_follow:
   # With vision_sorter, error > 0 means the black line is right of image center.
   # Positive ROS angular.z usually turns left, so the safe default is -1.0.
   angular_sign: -1.0
+
+  # HSV black-line threshold and ROI layout copied from vision_sorter defaults.
+  black_low: [0, 0, 0]
+  black_high: [179, 255, 85]
+  rois:
+    # [x, y, width, height, weight, roi_id]
+    - [0, 260, 640, 20, 0.25, 1]
+    - [0, 130, 640, 20, 0.20, 2]
+    - [0, 0, 640, 20, 0.10, 3]
+  min_line_area: 400
+  min_cross_area: 4000
+  cross_clear_ratio: 0.6
+
+  # Safer Python version of the C++ sorter_controller motion law.
+  cpp_style_motion: true
+  cpp_base_speed: 0.12
+  cpp_min_speed: 0.04
+  cpp_angle_speed_gain: 0.01
+  cpp_angular_gain: 0.03
+
+  # Route-only testing: grasp/place crosses perform U-turns instead of arm tasks.
+  uturn_crosses: [2, 5, 9]
+  # U-turns use a small forward component to avoid high-friction in-place
+  # spinning on the floor. This only affects uturn_crosses, not normal turns.
+  uturn_linear_x: 0.03
+  uturn_angular_z: 0.70
+  uturn_delay: 130
+  # After a scripted action, ignore crossing detection for a short time so the
+  # same physical intersection is not counted again while leaving it.
+  cross_ignore_ticks_after_action: 40
+  stop_crosses: [13]
+  turn_linear_x: 0.06
+  turn_angular_z: 0.35
+  return_angular_z: 0.35
+  first_turn_delay: 50
+  second_turn_delay: 50
+  third_turn_delay: 60
+  fourth_turn_delay: 50
+  fifth_turn_delay: 60
+  sixth_turn_delay: 50
+  return_delay: 100
+  over_turn_delay: 80

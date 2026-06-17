@@ -2,10 +2,16 @@
   <arg name="config" default="$(find tao_tasks)/config/control.yaml" />
   <arg name="publish_cmd_vel" default="true" />
   <arg name="forward_speed" default="0.05" />
+  <arg name="use_camera" default="true" />
+  <arg name="camera_index" default="0" />
+  <arg name="show" default="false" />
 
   <node pkg="tao_tasks" type="line_follow_controller.py" name="line_follow_controller" output="screen">
     <rosparam command="load" file="$(arg config)" />
     <param name="publish_cmd_vel" value="$(arg publish_cmd_vel)" />
     <param name="forward_speed" value="$(arg forward_speed)" />
+    <param name="use_camera" value="$(arg use_camera)" />
+    <param name="camera_index" value="$(arg camera_index)" />
+    <param name="show" value="$(arg show)" />
   </node>
 </launch>
