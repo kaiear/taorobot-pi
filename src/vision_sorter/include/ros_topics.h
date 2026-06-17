@@ -16,6 +16,9 @@ constexpr const char* kObjectDetected = "/vision/object/detected";
 constexpr const char* kObjectColor = "/vision/object/color";
 constexpr const char* kObjectOffsetX = "/vision/object/offset_x";
 constexpr const char* kObjectOffsetY = "/vision/object/offset_y";
+constexpr const char* kObjectArea = "/vision/object/area";
+constexpr const char* kObjectCenterX = "/vision/object/center_x";
+constexpr const char* kObjectCenterY = "/vision/object/center_y";
 constexpr const char* kFaceDetected = "/vision/face/detected";
 constexpr const char* kTagId = "/vision/tag/id";
 

@@ -17,7 +17,7 @@
 ### 窗口 2：Remote SSH 树莓派窗口
 
 ```text
-连接目标：ubuntu@树莓派IP
+连接目标：ubuntu@100.124.15.24，网线备用 ubuntu@192.168.137.100
 用途：运行 roscore、catkin_make、rosrun、rostopic、串口测试
 启用插件：Remote SSH
 不要启用：Cline
@@ -33,6 +33,30 @@ Windows: D:\cpprobot\pi\src
 ```
 
 树莓派上的 `build/`、`devel/`、`log/` 由 `catkin_make` 自动生成，不同步回 Windows，也不提交 Git。
+
+## 连接优先级
+
+PowerShell 脚本默认优先使用 Tailscale：
+
+```text
+优先：100.124.15.24
+备用：192.168.137.100
+```
+
+也就是说，执行下面命令时会先测试 Tailscale SSH；如果不通，再尝试网线 IP：
+
+```powershell
+.\scripts\sync_to_pi.ps1
+.\scripts\pi_exec.ps1 "hostname && pwd"
+```
+
+SFTP 插件通常不支持自动 fallback，所以 `sftp_config.example.json` 默认填写 Tailscale IP。如果 Tailscale 临时不可用，可以手动把 `host` 改为网线 IP：
+
+```json
+"host": "192.168.137.100"
+```
+
+当前 ROS 节点都在树莓派本机运行，SSH/SFTP 使用 Tailscale 或网线不会影响 ROS 本机通信，因此不需要修改 `ROS_MASTER_URI` 或 `ROS_IP`。
 
 ## 为什么不要在 Remote SSH 窗口用 Cline
 

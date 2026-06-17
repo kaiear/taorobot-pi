@@ -1,0 +1,66 @@
+line_pick_sort_mission:
+  cmd_vel_topic: /cmd_vel
+  line_visible_topic: /vision/line/visible
+  line_error_topic: /vision/line/error
+  intersection_topic: /vision/intersection/detected
+  pick_service: /visual_pick_place/pick
+  place_service: /visual_pick_place/place
+
+  auto_start: false
+  rate_hz: 20.0
+  intersection_debounce_sec: 1.2
+  lost_timeout: 0.35
+
+  line_follow:
+    forward_speed: 0.055
+    intersection_forward_speed: 0.025
+    kp_angular: 0.45
+    max_angular_z: 0.35
+    error_deadband: 0.03
+    angular_sign: -1.0
+
+  turns:
+    angular_z: 0.32
+    left_sec: 1.15
+    right_sec: 1.15
+    turn_back_sec: 2.35
+    settle_sec: 0.20
+
+  route:
+    - id: 1
+      kind: cross
+      action: straight
+    - id: 2
+      kind: t
+      action: pick
+      after: turn_back
+    - id: 3
+      kind: cross
+      action: right
+      after: place
+    - id: 4
+      kind: cross
+      action: left
+    - id: 5
+      kind: t
+      action: pick
+      after: turn_back
+    - id: 6
+      kind: cross
+      action: right
+      after: place_turn_back
+    - id: 7
+      kind: cross
+      action: right
+    - id: 8
+      kind: t
+      action: pick
+      after: turn_back
+    - id: 9
+      kind: cross
+      action: left
+      after: place
+    - id: 10
+      kind: cross
+      action: right
+      after: done

@@ -1,0 +1,14 @@
+<launch>
+  <arg name="route_config" default="$(find tao_tasks)/config/route_plan.yaml" />
+  <arg name="visual_config" default="$(find tao_tasks)/config/visual_servo.yaml" />
+  <arg name="auto_start" default="false" />
+
+  <node pkg="tao_tasks" type="visual_pick_place_controller.py" name="visual_pick_place" output="screen">
+    <rosparam command="load" file="$(arg visual_config)" />
+  </node>
+
+  <node pkg="tao_tasks" type="line_pick_sort_mission.py" name="line_pick_sort_mission" output="screen">
+    <rosparam command="load" file="$(arg route_config)" />
+    <param name="auto_start" value="$(arg auto_start)" />
+  </node>
+</launch>

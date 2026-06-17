@@ -1,0 +1,51 @@
+visual_pick_place:
+  cmd_vel_topic: /cmd_vel
+  object_detected_topic: /vision/object/detected
+  object_color_topic: /vision/object/color
+  object_offset_x_topic: /vision/object/offset_x
+  object_offset_y_topic: /vision/object/offset_y
+  object_area_topic: /vision/object/area
+  gripper_topic: /gripper/command
+  arm_joints_topic: /tao_arm/joints_protocol_units
+
+  rate_hz: 15.0
+  command_timeout_sec: 12.0
+  stable_frames_required: 4
+  valid_colors: [red, green, blue]
+
+  # offset_x convention: >0 means target is right of image center.
+  # If the real robot moves away from the target, flip these signs in YAML.
+  servo:
+    angular_sign: -1.0
+    lateral_sign: 1.0
+    forward_sign: 1.0
+    kp_angular: 0.30
+    kp_lateral: 0.00
+    approach_speed: 0.025
+    max_angular_z: 0.18
+    max_lateral_y: 0.02
+
+  pick:
+    center_x_tolerance: 0.10
+    center_y_tolerance: 0.14
+    ready_area: 2500.0
+    min_area: 600.0
+    use_base_servo: true
+    pre_grasp_pose: []
+    lift_pose: []
+    arm_step_sec: 0.70
+
+  place:
+    center_x_tolerance: 0.12
+    center_y_tolerance: 0.16
+    ready_area: 3000.0
+    min_area: 800.0
+    use_base_servo: true
+    pre_place_pose: []
+    retreat_pose: []
+    arm_step_sec: 0.70
+
+  gripper:
+    open: 80
+    close: 25
+    settle_sec: 0.60
