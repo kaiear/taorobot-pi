@@ -47,7 +47,7 @@ class TaoSerialNode:
         self.joint_state_names = list(
             rospy.get_param(
                 "~joint_state_names",
-                ["arm_0_joint", "arm_1_joint", "arm_2_joint", "arm_3_joint", "arm_4_joint", "arm_5_joint"],
+                ["arm_0_joint", "arm_1_joint", "arm_2_joint", "arm_3_joint", "arm_4_joint"],
             )
         )
         self.joint_state_scale = float(rospy.get_param("~joint_state_scale", 1000.0))

@@ -20,7 +20,6 @@ joint_state_names:
   - arm_2_joint
   - arm_3_joint
   - arm_4_joint
-  - arm_5_joint
 joint_state_scale: 1000.0
 auto_set_mode: true
 log_tx: false

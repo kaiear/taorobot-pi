@@ -1,0 +1,7 @@
+<launch>
+  <arg name="config" default="$(find tao_tasks)/config/arm_pose_tuner.yaml" />
+
+  <node pkg="tao_tasks" type="arm_pose_tuner.py" name="arm_pose_tuner" output="screen">
+    <rosparam command="load" file="$(arg config)" />
+  </node>
+</launch>

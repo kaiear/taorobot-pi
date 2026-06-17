@@ -48,7 +48,7 @@ line_follow:
 
   # Safer Python version of the C++ sorter_controller motion law.
   cpp_style_motion: true
-  cpp_base_speed: 0.12
+  cpp_base_speed: 0.35
   cpp_min_speed: 0.04
   cpp_angle_speed_gain: 0.01
   cpp_angular_gain: 0.03
@@ -60,7 +60,7 @@ line_follow:
   enable_pick_place: true
   pick_crosses: [2, 5, 9]
   # Optional route-only fallback; keep empty so cross=2/5/9 no longer skip grasping.
-  uturn_crosses: []
+  uturn_crosses: [7]
   # After cross=2/5/9 finishes the grasp phase, perform the requested U-turn
   # before returning to normal line following.
   post_pick_uturn_crosses: [2, 5, 9]
@@ -73,6 +73,26 @@ line_follow:
   pick_align_max_retries: 2
   pick_align_skip_on_timeout: true
   pick_align_stable_ticks: 50
+  color_confirm_ticks: 2
+  pick_center_tolerance_px: 10
+  place_center_tolerance_px: 10
+  place_base_tolerance_px: 50
+  pick_adjust_x_step: 0.5
+  pick_adjust_y_step: 0.3
+  place_adjust_x_step: 0.3
+  place_adjust_y_step: 0.5
+  place_seek_timeout_ticks: 160
+  place_base_align_timeout_ticks: 160
+  place_arm_align_timeout_ticks: 180
+  place_skip_on_timeout: true
+  place_seek_linear_x: 0.1
+  place_stable_ticks: 10
+  # Fixed destination-color policy for place crosses when picking does not use
+  # vision and therefore captured_color is unavailable.
+  place_target_color_by_cross:
+    "3": red
+    "6": blue
+    "10": green
   color_log_interval: 1.0
   color_roi: [0, 0, 640, 300]
   color_ranges:
@@ -98,14 +118,26 @@ line_follow:
   # avoiding the common ROS race where the first command is dropped at startup.
   serial_tx_wait_timeout: 1.0
   protocol_offsets: [0, 0, 0, 0, 0, 0]
+  # Per-joint zero/installation trim in degrees, applied just before ARM_JOINTS
+  # serial conversion.  Use this for real-servo zero mismatch, e.g. if the
+  # shoulder physical zero is vertical but the source model expects a slight
+  # forward lean.  Test one axis at a time, usually ±5~10 degrees first.
+  # order: [base, shoulder/big_arm, elbow/small_arm, wrist, claw_rotate, gripper]
+  protocol_trim_degrees: [0, 0, 0, 0, 0, 0]
   protocol_signs: [1, 1, 1, 1, 1, 1]
   protocol_scale: 1000.0
   protocol_min: -32768
   protocol_max: 32767
   arm_err_x: 0.0
   arm_up: 95.0
-  grasp_height: 35.0
-  arm_skewing: 10.0
+  # Safer first-pass pick posture: avoid the old y+30 and extra skew pushing the
+  # wrist into an extreme folded-back IK branch near the chassis.
+  grasp_height: 55.0
+  arm_skewing: 0.0
+  pick_grasp_y_offset: 0.0
+  ik_alpha_min: -80
+  ik_alpha_max: -10
+  ik_alpha_preferred: -35
   open_gripper: 1.0
   closed_gripper: 0.0
   # Keep the arm at its current/zero pose when the task starts. The arm will
@@ -114,12 +146,56 @@ line_follow:
   # During cross=2/5/9 color alignment, do not pre-position the arm before the
   # block is stably recognized; pick sequence moves directly from current pose.
   preposition_arm_before_pick: false
+  # Real-robot fixed-pose pick test. When true, cross=2/5/9 skips color/IK pick
+  # alignment and sends these joint templates directly, then performs the normal
+  # post-pick U-turn. Values are degrees in order:
+  # [base, shoulder/big_arm, elbow/small_arm, wrist, claw_rotate, gripper]
+  fixed_pick_sequence_enabled: true
+  fixed_pick_sequence_duration_ms: 1000
+  fixed_pick_sequence_hold_ticks: 20
+  fixed_pick_sequence_deg:
+    - [0, 60, -50, 3, 0, 50]
+    - [0, 80, -50, -5, 0, 50]
+    - [0, 80, -50, -5, 0, -30]
+    - [0, 0, 0, 0, 0, -30]
 
-  # MoveIt is optional for this sorter flow. The chassis still uses cmd_vel.
-  # true = plan arm joints with MoveIt group "arm" and execute through
-  # tao_moveit_bridge -> ARM_JOINTS serial. If planning/execution fails,
-  # moveit_fallback_on_failure keeps the original direct ARM_JOINTS path alive.
-  use_moveit_backend: true
+  # Fixed-pose place flow for cross=3/6/10.  These values use the same degree
+  # order as fixed_pick_sequence_deg:
+  # [base, shoulder/big_arm, elbow/small_arm, wrist, claw_rotate, gripper]
+  # At cross=3/6/10, after the chassis turn and mid adjustment, move the arm to
+  # this pre-place pose first.  Then use place vision only to find/align the
+  # destination color ring; after chassis alignment, execute the fixed sequence
+  # below without visual IK arm solving.
+  fixed_place_prepose_enabled: true
+  fixed_place_prepose_duration_ms: 1000
+  fixed_place_prepose_hold_ticks: 20
+  fixed_place_prepose_deg_by_cross:
+    "3": [-90, 30, -40, 35, 0, -30]
+    "6": [-90, 30, -40, 35, 0, -30]
+    "10": [-90, 30, -40, 35, 0, -30]
+
+  # After the destination color ring is found and the chassis is aligned, execute
+  # these two fixed place presets directly.  No visual IK arm solving is used in
+  # the place phase.
+  fixed_place_sequence_enabled: true
+  fixed_place_sequence_duration_ms: 1000
+  fixed_place_sequence_hold_ticks: 20
+  fixed_place_sequence_deg_by_cross:
+    "3":
+      - [-90, 70, -50, -20, 0, -30]
+      - [-90, 70, -50, -20, 0, 50]
+    "6":
+      - [-90, 70, -50, -20, 0, -30]
+      - [-90, 70, -50, -20, 0, 50]
+    "10":
+      - [-90, 70, -50, -20, 0, -30]
+      - [-90, 70, -50, -20, 0, 50]
+
+  # MoveIt is optional for this sorter flow. Emergency/default mode is direct
+  # custom IK + ARM_JOINTS serial, matching vision_sorter C++ behavior. Keep
+  # this false unless move_group and /arm_controller/follow_joint_trajectory
+  # are both confirmed available.
+  use_moveit_backend: false
   moveit_use_commander: true
   moveit_group_name: arm
   moveit_action_name: /arm_controller/follow_joint_trajectory
@@ -142,7 +218,7 @@ line_follow:
   cross_ignore_ticks_after_action: 40
   stop_crosses: [13]
   turn_linear_x: 0.06
-  turn_angular_z: 0.35
+  turn_angular_z: 0.55
   return_angular_z: 0.35
   first_turn_delay: 50
   second_turn_delay: 50

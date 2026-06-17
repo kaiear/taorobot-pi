@@ -1,0 +1,38 @@
+arm_pose_tuner:
+  # Pure joint-template arm tuner.  Values are in degrees and can be copied
+  # directly into future arm_pick_template presets.
+  command_topic: /arm_pose_tuner/command
+  serial_tx_topic: /tao_serial/tx
+  arm_joints_topic: /tao_arm/joints_protocol_units
+  gripper_topic: /gripper/command
+
+  start_pose: safe_home
+  auto_start: false
+  duration_ms: 800
+  step_deg: 2.0
+  big_step_deg: 10.0
+  gripper_joint_index: 5
+  gripper_open_deg: 0.0
+  gripper_close_deg: 35.0
+
+  use_tx_command: true
+  publish_arm_shadow_topic: true
+  serial_tx_wait_timeout: 1.0
+  protocol_offsets: [0, 0, 0, 0, 0, 0]
+  protocol_trim_degrees: [0, 0, 0, 0, 0, 0]
+  protocol_signs: [1, 1, 1, 1, 1, 1]
+  protocol_scale: 1000.0
+  protocol_min: -32768
+  protocol_max: 32767
+
+  # Initial safe examples only.  Tune with arm_pose_tuner.py before using in the
+  # real pick/place sequence.
+  presets:
+    safe_home: [0, 0, 0, 0, 0, 0]
+    detect: [0, 25, -55, 35, 0, 0]
+    pre_grasp: [0, 32, -60, 38, 0, 0]
+    grasp_open: [0, 42, -65, 30, 0, 0]
+    grasp_close: [0, 42, -65, 30, 0, 35]
+    lift: [0, 20, -50, 40, 0, 35]
+    place_left_ready: [-90, 20, -50, 40, 0, 35]
+    place_left_drop: [-90, 35, -60, 30, 0, 0]
