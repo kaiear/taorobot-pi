@@ -49,7 +49,7 @@ line_follow:
   # Safer Python version of the C++ sorter_controller motion law.
   cpp_style_motion: true
   cpp_base_speed: 0.35
-  cpp_min_speed: 0.04
+  cpp_min_speed: 0.06
   cpp_angle_speed_gain: 0.01
   cpp_angular_gain: 0.03
 
@@ -64,9 +64,9 @@ line_follow:
   # After cross=2/5/9 finishes the grasp phase, perform the requested U-turn
   # before returning to normal line following.
   post_pick_uturn_crosses: [2, 5, 9]
-  post_pick_uturn_linear_x: 0.03
-  post_pick_uturn_angular_z: 0.70
-  post_pick_uturn_delay: 130
+  post_pick_uturn_linear_x: 0.02
+  post_pick_uturn_angular_z: 0.75
+  post_pick_uturn_delay: 100
   # Debug-friendly threshold; raise after lighting/camera exposure is stable.
   min_color_area: 500
   pick_align_timeout_ticks: 180
